@@ -190,14 +190,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           />
           {isSpeechRecognitionSupported && (
             isListening ? (
-              <button onClick={handleSend}
-                  className="flex-shrink-0 rounded-full p-2 text-white bg-indigo-600 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Parar de ouvir e enviar mensagem"
+              <button
+                onClick={cancelListening}
+                className="flex-shrink-0 rounded-full p-2 text-white bg-red-600 hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                aria-label="Cancelar gravação"
               >
-                  <SendIcon className="h-5 w-5" />
+                <TrashIcon className="h-5 w-5" />
               </button>
             ) : (
-              <button onClick={startListening}
+              <button
+                onClick={startListening}
                 disabled={isInputDisabled || !!inputValue.trim()}
                 className="flex-shrink-0 rounded-full p-2 text-white bg-indigo-600 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Começar a ouvir"
@@ -206,6 +208,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               </button>
             )
           )}
+          <button
+            onClick={handleSend}
+            disabled={isInputDisabled || (!inputValue.trim() && !isListening)}
+            className="flex-shrink-0 rounded-full bg-indigo-600 p-2 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Enviar mensagem"
+          >
+            <SendIcon className="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>
