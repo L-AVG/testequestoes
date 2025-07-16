@@ -182,13 +182,15 @@ const App: React.FC = () => {
     }
   }, [isChatActive, isListening, processMessage]);
 
+  const cancelListening = () => {
+    if (!sttServiceRef.current) return;
+    sttServiceRef.current.cancelRecording();
+  };
+  
   const toggleAudioOutput = () => {
     setIsAudioOutputEnabled(prev => {
       const newState = !prev;
-      if (!newState) {
-        ttsServiceRef.current?.interrupt();
-      }
-
+      if (!newState) ttsServiceRef.current?.interrupt();
       addLogEntry('SYSTEM', `Saída de áudio ${newState ? 'ativada' : 'desativada'}.`);
       return newState;
     });
