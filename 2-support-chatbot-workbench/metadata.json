@@ -1,8 +1,0 @@
-{
-  "name": "2 Support Chatbot Workbench",
-  "description": "An advanced chatbot application that uses a pre-loaded knowledge base to provide contextual answers. This version integrates OpenAI for high-quality Speech-to-Text (Whisper) and Text-to-Speech.",
-  "requestFramePermissions": [
-    "microphone"
-  ],
-  "prompt": ""
-}
