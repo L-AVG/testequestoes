@@ -1,5 +1,6 @@
+// components/RightPanel.tsx
+
 import React from 'react';
-import LogPanel from './LogPanel';
 
 interface RightPanelProps {
   logEntries: string[];
@@ -7,16 +8,33 @@ interface RightPanelProps {
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({ logEntries, isInitializing }) => {
+  const [collapsed, setCollapsed] = React.useState(true);
+
+  const toggleCollapse = () => {
+    setCollapsed(prev => !prev);
+  };
+
   return (
-    <div className="flex h-full max-h-full flex-col">
-      {isInitializing ? (
-         <div className="flex h-full flex-col items-center justify-center bg-white p-4 rounded-lg shadow-md text-center">
-           <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600 mb-4"></div>
-           <h3 className="text-lg font-semibold text-slate-700">Inicializando...</h3>
-           <p className="text-sm text-slate-500">Configurando o assistente de IA. Isso pode levar um momento.</p>
-         </div>
-      ) : (
-        <LogPanel logEntries={logEntries} />
+    <div className="h-full flex flex-col bg-white rounded-2xl shadow-lg p-4">
+      <button
+        onClick={toggleCollapse}
+        className="self-start mb-2 text-sm text-blue-600 hover:text-blue-800 focus:outline-none"
+      >
+        {collapsed ? 'Mostrar registro da conversa' : 'Ocultar registro da conversa'}
+      </button>
+
+      {!collapsed && (
+        <div className="flex-1 overflow-y-auto border rounded p-2 bg-slate-50">
+          {isInitializing ? (
+            <div className="text-xs italic text-gray-500">Carregando...</div>
+          ) : (
+            logEntries.map((entry, idx) => (
+              <div key={idx} className="text-xs font-mono whitespace-pre-wrap mb-1">
+                {entry}
+              </div>
+            ))
+          )}
+        </div>
       )}
     </div>
   );
