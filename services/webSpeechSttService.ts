@@ -5,7 +5,7 @@ type AddLogEntryType = (source: 'USER' | 'BOT' | 'SYSTEM' | 'API', content: stri
 export class WebSpeechSttService {
   recognition: SpeechRecognition;
   isRecording: boolean;
-  transcript: string;
+  lastTranscript: string; // Aqui armazenamos o texto continuamente
   resolve?: (t: string) => void;
   reject?: (err: any) => void;
   addLogEntry?: AddLogEntryType;
@@ -22,11 +22,11 @@ export class WebSpeechSttService {
     this.recognition = new SpeechRecognitionImpl();
 
     this.recognition.lang = 'pt-BR';
-    this.recognition.continuous = true; // Modo contínuo: não para automaticamente
-    this.recognition.interimResults = true; // Pode exibir resultados parciais
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
 
     this.isRecording = false;
-    this.transcript = '';
+    this.lastTranscript = '';
 
     this.recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = '';
@@ -39,8 +39,8 @@ export class WebSpeechSttService {
           interim += res[0].transcript;
         }
       }
-      this.transcript = (final + interim).trim();
-      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Parcial: ${this.transcript}`);
+      this.lastTranscript = (final + interim).trim();
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Parcial: ${this.lastTranscript}`);
     };
 
     this.recognition.onerror = (event: any) => {
@@ -51,21 +51,21 @@ export class WebSpeechSttService {
       }
     };
 
-    // Impede parada automática: se encerrar sozinho, reinicia (trapaça padrão para Chrome)
+    // Reinicia se o reconhecimento parar sozinho
     this.recognition.onend = () => {
       if (this.isRecording) {
         if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Reiniciando reconhecimento (onend automático)`);
         try {
           this.recognition.start();
         } catch (e) {
-          // Em caso de erro, ignora
+          // Ignora erro de start duplicado
         }
       }
     };
   }
 
   startRecording(): Promise<string> {
-    this.transcript = '';
+    this.lastTranscript = '';
     this.isRecording = true;
     try {
       this.recognition.start();
@@ -89,8 +89,9 @@ export class WebSpeechSttService {
     } catch (e) {
       if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao parar: ${e}`);
     }
+    // Sempre retorna o último texto registrado, mesmo que o recognition tenha parado antes!
     if (this.resolve) {
-      this.resolve(this.transcript.trim());
+      this.resolve(this.lastTranscript);
       this.resolve = undefined;
       this.reject = undefined;
     }
