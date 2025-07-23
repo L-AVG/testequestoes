@@ -26,6 +26,9 @@ const App: React.FC = () => {
   const ttsServiceRef = useRef<ElevenLabsTtsService | null>(null);
   const sttServiceRef = useRef<WebSpeechSttService | null>(null);
 
+  // Aqui guardamos a promise retornada por startRecording()
+  const recordingPromiseRef = useRef<Promise<string> | null>(null);
+
   const addLogEntry = useCallback((source: 'USER' | 'BOT' | 'SYSTEM' | 'API', content: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogEntries(prev => [...prev, `[${timestamp}] [${source}] ${content}`]);
@@ -140,18 +143,25 @@ const App: React.FC = () => {
     }
   }, [userId, isChatActive, addLogEntry, isAudioOutputEnabled]);
 
-  // Iniciar gravação (não aguarda Promise)
+  // ============================
+  // Fluxo de gravação corrigido
+  // ============================
+
   const startListening = useCallback(() => {
     if (!isSpeechRecognitionSupported || !sttServiceRef.current || isListening) return;
     setIsListening(true);
-    sttServiceRef.current.startRecording();
+    // GUARDA A PROMISE para aguardar depois
+    recordingPromiseRef.current = sttServiceRef.current.startRecording();
   }, [isSpeechRecognitionSupported, isListening]);
 
-  // Parar gravação e enviar
   const stopAndSendTranscript = useCallback(async () => {
     if (!sttServiceRef.current || !isListening) return;
     setIsListening(false);
-    const transcript = await sttServiceRef.current.stopRecording();
+    // Para a gravação (void)
+    sttServiceRef.current.stopRecording();
+    // AGUARDA a promise iniciada em startListening
+    const transcript = await recordingPromiseRef.current!;
+    recordingPromiseRef.current = null;
     addLogEntry('SYSTEM', `[DEBUG] transcript recebido no handler: "${transcript}"`);
     if (transcript && transcript.trim()) {
       await processMessage(transcript);
@@ -160,11 +170,11 @@ const App: React.FC = () => {
     }
   }, [isListening, processMessage, addLogEntry]);
 
-  // Cancelar gravação e descartar transcrição
   const cancelListening = useCallback(() => {
     if (!sttServiceRef.current || !isListening) return;
     setIsListening(false);
     sttServiceRef.current.cancelRecording();
+    recordingPromiseRef.current = null;
     addLogEntry('SYSTEM', 'Gravação de voz cancelada pelo usuário.');
   }, [isListening, addLogEntry]);
 
