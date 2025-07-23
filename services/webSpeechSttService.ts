@@ -1,97 +1,113 @@
-// The SpeechRecognition-related types are declared globally in `types.ts` and should not be imported.
+// services/webSpeechSttService.ts
 
-/**
- * A service for managing Speech-to-Text (STT) functionality using the browser's native Web Speech API.
- * This service does not require any external API keys.
- */
+type AddLogEntryType = (source: 'USER' | 'BOT' | 'SYSTEM' | 'API', content: string) => void;
+
 export class WebSpeechSttService {
-    private recognition: SpeechRecognition | null = null;
-    private resolveTranscript: ((value: string | null) => void) | null = null;
-    private addLogEntry: (source: 'SYSTEM', content: string) => void;
-    private isRecording: boolean = false;
+  recognition: SpeechRecognition;
+  isRecording: boolean;
+  transcript: string;
+  resolve?: (t: string) => void;
+  reject?: (err: any) => void;
+  addLogEntry?: AddLogEntryType;
 
-    constructor(addLogEntry: (source: 'SYSTEM', content: string) => void) {
-        this.addLogEntry = addLogEntry;
-        const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognitionAPI) {
-            this.recognition = new SpeechRecognitionAPI();
-            this.setupRecognition();
+  static isSupported() {
+    return typeof window !== 'undefined' &&
+      (!!(window as any).SpeechRecognition || !!(window as any).webkitSpeechRecognition);
+  }
+
+  constructor(addLogEntry?: AddLogEntryType) {
+    this.addLogEntry = addLogEntry;
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionImpl) throw new Error("Web Speech API não suportada.");
+    this.recognition = new SpeechRecognitionImpl();
+
+    this.recognition.lang = 'pt-BR';
+    this.recognition.continuous = true; // Modo contínuo: não para automaticamente
+    this.recognition.interimResults = true; // Pode exibir resultados parciais
+
+    this.isRecording = false;
+    this.transcript = '';
+
+    this.recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        const res = event.results[i];
+        if (res.isFinal) {
+          final += res[0].transcript;
         } else {
-            this.addLogEntry('SYSTEM', 'Web Speech API (STT) não é suportado neste navegador.');
+          interim += res[0].transcript;
         }
-    }
+      }
+      this.transcript = (final + interim).trim();
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Parcial: ${this.transcript}`);
+    };
 
-    private setupRecognition() {
-        if (!this.recognition) return;
-        this.recognition.lang = 'pt-BR';
-        this.recognition.interimResults = false;
-        this.recognition.continuous = false;
+    this.recognition.onerror = (event: any) => {
+      if (this.isRecording && this.reject) {
+        if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro: ${event.error}`);
+        this.reject(event.error);
+        this.isRecording = false;
+      }
+    };
 
-        this.recognition.onresult = (event: SpeechRecognitionEvent) => {
-            const transcript = event.results[event.results.length - 1][0].transcript.trim();
-            this.addLogEntry('SYSTEM', `Transcrição recebida: "${transcript}"`);
-            if (this.resolveTranscript) {
-                this.resolveTranscript(transcript);
-                this.resolveTranscript = null;
-            }
-        };
-
-        this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            let errorMessage = `Erro no reconhecimento de voz: ${event.error}`;
-            if (event.error === 'no-speech') errorMessage = 'Nenhuma fala foi detectada.';
-            else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') errorMessage = 'Permissão para o microfone negada ou serviço não permitido.';
-            this.addLogEntry('SYSTEM', errorMessage);
-            if (this.resolveTranscript) {
-                this.resolveTranscript(null);
-                this.resolveTranscript = null;
-            }
-        };
-
-        this.recognition.onend = () => {
-            this.isRecording = false;
-            this.addLogEntry('SYSTEM', 'Gravação (Web Speech API) finalizada.');
-            if (this.resolveTranscript) { // Resolve if not already resolved by onresult
-                this.resolveTranscript(null); // Resolves with null for timeout/no-speech case
-                this.resolveTranscript = null;
-            }
-        };
-    }
-
-    public static isSupported(): boolean {
-        return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
-    }
-
-    public startRecording(): Promise<string | null> {
-        return new Promise((resolve) => {
-            if (this.isRecording) {
-                this.addLogEntry('SYSTEM', 'Gravação já em progresso.');
-                return resolve(null);
-            }
-            if (!this.recognition) {
-                this.addLogEntry('SYSTEM', 'Tentativa de gravar, mas a Web Speech API não é suportada.');
-                return resolve(null);
-            }
-            this.addLogEntry('SYSTEM', 'Iniciando gravação (Web Speech API).');
-            this.isRecording = true;
-            this.resolveTranscript = resolve;
-            this.recognition.start();
-        });
-    }
-
-    public stopRecording(): void {
-        if (this.recognition && this.isRecording) {
-            this.recognition.stop();
+    // Impede parada automática: se encerrar sozinho, reinicia (trapaça padrão para Chrome)
+    this.recognition.onend = () => {
+      if (this.isRecording) {
+        if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Reiniciando reconhecimento (onend automático)`);
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // Em caso de erro, ignora
         }
+      }
+    };
+  }
+
+  startRecording(): Promise<string> {
+    this.transcript = '';
+    this.isRecording = true;
+    try {
+      this.recognition.start();
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Gravação iniciada`);
+    } catch (e) {
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao iniciar: ${e}`);
+      throw e;
     }
 
-    public cancelRecording(): void {
-        if (this.recognition && this.isRecording) {
-            this.addLogEntry('SYSTEM', 'Cancelando gravação (Web Speech API).');
-            if (this.resolveTranscript) {
-                this.resolveTranscript(null);
-                this.resolveTranscript = null;
-            }
-            this.recognition.abort();
-        }
+    return new Promise((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
+  }
+
+  stopRecording() {
+    this.isRecording = false;
+    try {
+      this.recognition.stop();
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Gravação encerrada pelo usuário`);
+    } catch (e) {
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao parar: ${e}`);
     }
+    if (this.resolve) {
+      this.resolve(this.transcript.trim());
+      this.resolve = undefined;
+      this.reject = undefined;
+    }
+  }
+
+  cancelRecording() {
+    this.isRecording = false;
+    try {
+      this.recognition.abort();
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Gravação abortada`);
+    } catch (e) {
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao abortar: ${e}`);
+    }
+    if (this.resolve) {
+      this.resolve('');
+      this.resolve = undefined;
+      this.reject = undefined;
+    }
+  }
 }
