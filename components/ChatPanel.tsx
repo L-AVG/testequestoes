@@ -9,6 +9,7 @@ interface ChatPanelProps {
   onStartChat: () => void;
   isListening: boolean;
   startListening: () => void;
+  stopAndSendTranscript: () => void;
   cancelListening: () => void;
   isSpeechRecognitionSupported: boolean;
   isAudioOutputEnabled: boolean;
@@ -25,6 +26,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   onStartChat,
   isListening,
   startListening,
+  stopAndSendTranscript,
   cancelListening,
   isSpeechRecognitionSupported,
   isAudioOutputEnabled,
@@ -52,22 +54,41 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { onSendMessage(input); setInput(''); } }}
-          disabled={!isChatActive || isLoading}
+          disabled={!isChatActive || isLoading || isListening}
         />
         <button
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           onClick={() => { onSendMessage(input); setInput(''); }}
-          disabled={!isChatActive || isLoading}
+          disabled={!isChatActive || isLoading || isListening}
         >
           Enviar
         </button>
-        <button
-          className={`px-4 py-2 rounded-lg ${isListening ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-800'}`}
-          onClick={isListening ? cancelListening : startListening}
-          disabled={!isSpeechRecognitionSupported || isLoading}
-        >
-          {isListening ? 'Parar' : '🎤 Falar'}
-        </button>
+        {!isListening ? (
+          <button
+            className={`px-4 py-2 rounded-lg ${isSpeechRecognitionSupported ? 'bg-slate-300 text-slate-800' : 'bg-slate-100 text-slate-400'}`}
+            onClick={startListening}
+            disabled={!isSpeechRecognitionSupported || isLoading}
+          >
+            🎤 Falar
+          </button>
+        ) : (
+          <>
+            <button
+              className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800"
+              onClick={stopAndSendTranscript}
+              disabled={isLoading}
+            >
+              Enviar
+            </button>
+            <button
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              onClick={cancelListening}
+              disabled={isLoading}
+            >
+              Cancelar
+            </button>
+          </>
+        )}
       </div>
       {!isChatActive && (
         <button
