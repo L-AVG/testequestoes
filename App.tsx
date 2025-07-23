@@ -85,7 +85,7 @@ const App: React.FC = () => {
 
   const handleStartChat = () => {
     if (messages.length === 0) {
-      const welcomeMessage = { id: Date.now().toString(), text: 'Bem-vindo ao suporte da SynthWave Audio! Como posso ajudar?', sender: MessageSender.SYSTEM };
+      const welcomeMessage = { id: Date.now().toString(), text: 'Bem-vindo ao assistente de TCP, aqui irei apoiar a ti e seu terapeuta ao longo das semanas', sender: MessageSender.SYSTEM };
       setMessages([welcomeMessage]);
       addLogEntry('SYSTEM', 'Nenhum histórico encontrado. Iniciando nova conversa.');
     }
