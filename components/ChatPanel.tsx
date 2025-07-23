@@ -1,17 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Message, MessageSender } from '../types';
-import SendIcon from './icons/SendIcon';
-import UserIcon from './icons/UserIcon';
-import BotIcon from './icons/BotIcon';
-import MicrophoneIcon from './icons/MicrophoneIcon';
-import SpeakerOnIcon from './icons/SpeakerOnIcon';
-import SpeakerOffIcon from './icons/SpeakerOffIcon';
-import TrashIcon from './icons/TrashIcon';
-
+import React from 'react';
+import { Message } from '../types';
 
 interface ChatPanelProps {
   messages: Message[];
-  onSendMessage: (message: string) => void;
+  onSendMessage: (text: string) => void;
   isLoading: boolean;
   isChatActive: boolean;
   onStartChat: () => void;
@@ -23,51 +15,17 @@ interface ChatPanelProps {
   toggleAudioOutput: () => void;
   isInitializing: boolean;
   initializationError: string | null;
+
+  // Novas props:
+  pendingTranscript: string | null;
+  setPendingTranscript: (v: string | null) => void;
+  handleSendTranscript: () => void;
 }
 
-const ChatMessage: React.FC<{ message: Message }> = ({ message }) => {
-  const isUser = message.sender === MessageSender.USER;
-  const isSystem = message.sender === MessageSender.SYSTEM;
-
-  if (isSystem) {
-    const isError = message.text.toLowerCase().startsWith('erro:');
-    return (
-      <div className="my-2 text-center text-xs text-slate-500">
-        <p className={`rounded-full px-3 py-1 inline-block ${isError ? 'bg-red-200 text-red-800' : 'bg-slate-200'}`}>{message.text}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex items-start gap-3 my-4 ${isUser ? 'justify-end' : ''}`}>
-      {!isUser && (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
-          <BotIcon className="h-5 w-5" />
-        </div>
-      )}
-      <div
-        className={`max-w-xl rounded-lg px-4 py-2 shadow ${
-          isUser
-            ? 'bg-indigo-600 text-white'
-            : 'bg-slate-200 text-slate-800'
-        }`}
-      >
-        <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-      </div>
-      {isUser && (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-600 text-white">
-          <UserIcon className="h-5 w-5" />
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-const ChatPanel: React.FC<ChatPanelProps> = ({ 
-  messages, 
-  onSendMessage, 
-  isLoading, 
+const ChatPanel: React.FC<ChatPanelProps> = ({
+  messages,
+  onSendMessage,
+  isLoading,
   isChatActive,
   onStartChat,
   isListening,
@@ -77,146 +35,78 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   isAudioOutputEnabled,
   toggleAudioOutput,
   isInitializing,
-  initializationError
+  initializationError,
+
+  pendingTranscript,
+  setPendingTranscript,
+  handleSendTranscript,
 }) => {
-  const [inputValue, setInputValue] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
-  
-  useEffect(() => {
-    if (isListening) {
-      setInputValue('');
-    }
-  }, [isListening]);
-
-  const handleSend = () => {
-    if (!isChatActive || isLoading) return;
-
-    if (isListening || inputValue.trim()) {
-      onSendMessage(inputValue.trim());
-      setInputValue('');
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !isListening) {
-      handleSend();
-    }
-  };
-
-  const getPlaceholderText = () => {
-    if (isInitializing) return "Inicializando assistente...";
-    if (initializationError) return "Erro na inicialização. Verifique os registros.";
-    if (isListening) return "Gravando... Pressione Enviar para finalizar.";
-    if (!isChatActive) return "Clique em 'Iniciar Conversa' para começar.";
-    return "Digite sua mensagem ou use o microfone...";
-  }
-  
-  const isInputDisabled = !isChatActive || isLoading || isListening || isInitializing || !!initializationError;
+  const [input, setInput] = React.useState('');
 
   return (
-    <div className="flex h-full flex-col bg-white p-4 rounded-lg shadow-md">
-      <div className="flex justify-between items-center border-b pb-3 mb-3">
-          <h2 className="text-lg font-bold text-slate-700">Suporte SynthWave</h2>
-          <button
-            onClick={toggleAudioOutput}
-            className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-indigo-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            aria-label={isAudioOutputEnabled ? "Desativar saída de áudio" : "Ativar saída de áudio"}
-          >
-            {isAudioOutputEnabled ? <SpeakerOnIcon className="h-6 w-6" /> : <SpeakerOffIcon className="h-6 w-6" />}
-          </button>
-      </div>
-
-      <div className="flex-grow overflow-y-auto pr-4 -mr-4">
-        {!isChatActive ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <BotIcon className="h-16 w-16 text-slate-300 mb-4" />
-            <h3 className="text-lg font-semibold text-slate-600">Pronto para começar?</h3>
-            <p className="text-sm text-slate-500 mb-6 max-w-xs">
-              {initializationError ? 
-                `Não foi possível iniciar o assistente. Verifique o registro para mais detalhes.` : 
-                `Clique no botão abaixo para iniciar o chat.`
-              }
-            </p>
-            <button
-              onClick={onStartChat}
-              disabled={isInitializing || !!initializationError}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Iniciar Conversa
-            </button>
+    <div className="flex flex-col h-full bg-white rounded-2xl shadow-lg p-4">
+      <div className="flex-1 overflow-y-auto mb-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`mb-2 ${msg.sender === 'USER' ? 'text-right' : 'text-left'}`}>
+            <span className={`inline-block px-3 py-2 rounded-xl ${msg.sender === 'USER' ? 'bg-blue-200' : 'bg-slate-200'}`}>
+              {msg.text}
+            </span>
           </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <ChatMessage key={msg.id} message={msg} />
-            ))}
-            {isLoading && (
-                <div className="flex items-start gap-3 my-4">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600">
-                        <BotIcon className="h-5 w-5" />
-                    </div>
-                    <div className="max-w-xl rounded-lg px-4 py-2 shadow bg-slate-200 text-slate-800">
-                        <div className="flex items-center space-x-2">
-                            <div className="h-2 w-2 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="h-2 w-2 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="h-2 w-2 bg-slate-500 rounded-full animate-bounce"></div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <div ref={messagesEndRef} />
-          </>
-        )}
+        ))}
       </div>
-
-      <div className="mt-4 border-t pt-4">
-        <div className="flex items-center space-x-3">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={getPlaceholderText()}
-            disabled={isInputDisabled}
-            className="w-full rounded-md border border-slate-300 p-2 text-sm text-slate-800 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-slate-50 disabled:cursor-not-allowed"
+      {/* BLOCO DA TRANSCRIÇÃO PENDENTE */}
+      {pendingTranscript && (
+        <div className="mb-4 p-4 bg-yellow-100 rounded-lg shadow">
+          <div className="mb-2 font-semibold">Transcrição pronta:</div>
+          <textarea
+            className="w-full p-2 border rounded"
+            rows={3}
+            value={pendingTranscript}
+            onChange={e => setPendingTranscript(e.target.value)}
           />
-          {isSpeechRecognitionSupported && (
-            isListening ? (
-              <button
-                onClick={cancelListening}
-                className="flex-shrink-0 rounded-full p-2 text-white bg-red-600 hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
-                aria-label="Cancelar gravação"
-              >
-                <TrashIcon className="h-5 w-5" />
-              </button>
-            ) : (
-              <button
-                onClick={startListening}
-                disabled={isInputDisabled || !!inputValue.trim()}
-                className="flex-shrink-0 rounded-full p-2 text-white bg-indigo-600 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Começar a ouvir"
-              >
-                <MicrophoneIcon className="h-5 w-5" />
-              </button>
-            )
-          )}
           <button
-            onClick={handleSend}
-            disabled={isInputDisabled || (!inputValue.trim() && !isListening)}
-            className="flex-shrink-0 rounded-full bg-indigo-600 p-2 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Enviar mensagem"
+            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={handleSendTranscript}
+            disabled={isLoading}
           >
-            <SendIcon className="h-5 w-5" />
+            Enviar
           </button>
         </div>
+      )}
+      <div className="flex gap-2 items-end">
+        <input
+          className="flex-1 border rounded-lg px-4 py-2"
+          placeholder="Digite sua mensagem..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { onSendMessage(input); setInput(''); } }}
+          disabled={!isChatActive || isLoading}
+        />
+        <button
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          onClick={() => { onSendMessage(input); setInput(''); }}
+          disabled={!isChatActive || isLoading}
+        >
+          Enviar
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg ${isListening ? 'bg-red-600 text-white' : 'bg-slate-300 text-slate-800'}`}
+          onClick={isListening ? cancelListening : startListening}
+          disabled={!isSpeechRecognitionSupported || isLoading}
+        >
+          {isListening ? 'Parar' : '🎤 Falar'}
+        </button>
+      </div>
+      {!isChatActive && (
+        <button
+          className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          onClick={onStartChat}
+        >
+          Iniciar chat
+        </button>
+      )}
+      <div className="mt-2 text-xs text-slate-400">
+        {isSpeechRecognitionSupported ? 'Reconhecimento de voz disponível.' : 'Reconhecimento de voz não suportado neste navegador.'}
       </div>
     </div>
   );
