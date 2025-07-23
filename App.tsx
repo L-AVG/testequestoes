@@ -98,6 +98,7 @@ const App: React.FC = () => {
   }, [userId, messages, isChatActive]);
 
   const processMessage = useCallback(async (messageText: string) => {
+    addLogEntry('SYSTEM', `[DEBUG] processMessage chamado com: "${messageText}"`);
     if (!userId || !isChatActive || !assistantServiceRef.current?.isInitialized) return;
     if (!messageText.trim()) return;
 
@@ -151,6 +152,7 @@ const App: React.FC = () => {
     if (!sttServiceRef.current || !isListening) return;
     setIsListening(false);
     const transcript = await sttServiceRef.current.stopRecording();
+    addLogEntry('SYSTEM', `[DEBUG] transcript recebido no handler: "${transcript}"`);
     if (transcript && transcript.trim()) {
       await processMessage(transcript);
     } else {
