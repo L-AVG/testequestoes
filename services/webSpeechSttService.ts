@@ -48,6 +48,8 @@ export class WebSpeechSttService {
         if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro: ${event.error}`);
         this.reject(event.error);
         this.isRecording = false;
+        this.resolve = undefined;
+        this.reject = undefined;
       }
     };
 
@@ -56,7 +58,9 @@ export class WebSpeechSttService {
         if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Reiniciando reconhecimento (onend automático)`);
         try {
           this.recognition.start();
-        } catch (e) {}
+        } catch (e) {
+          // Ignore erro de start duplo
+        }
       }
     };
   }
@@ -79,6 +83,7 @@ export class WebSpeechSttService {
   }
 
   stopRecording() {
+    if (!this.isRecording) return; // Protege contra chamadas duplas
     this.isRecording = false;
     try {
       this.recognition.stop();
@@ -88,13 +93,14 @@ export class WebSpeechSttService {
       if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao parar: ${e}`);
     }
     if (this.resolve) {
-      this.resolve(this.lastTranscript); // Sempre retorna o último valor!
+      this.resolve(this.lastTranscript);
       this.resolve = undefined;
       this.reject = undefined;
     }
   }
 
   cancelRecording() {
+    if (!this.isRecording) return; // Protege contra chamadas duplas
     this.isRecording = false;
     try {
       this.recognition.abort();
