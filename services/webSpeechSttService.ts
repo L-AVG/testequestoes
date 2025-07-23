@@ -5,7 +5,7 @@ type AddLogEntryType = (source: 'USER' | 'BOT' | 'SYSTEM' | 'API', content: stri
 export class WebSpeechSttService {
   recognition: SpeechRecognition;
   isRecording: boolean;
-  lastTranscript: string; // Aqui armazenamos o texto continuamente
+  lastTranscript: string;
   resolve?: (t: string) => void;
   reject?: (err: any) => void;
   addLogEntry?: AddLogEntryType;
@@ -51,21 +51,18 @@ export class WebSpeechSttService {
       }
     };
 
-    // Reinicia se o reconhecimento parar sozinho
     this.recognition.onend = () => {
       if (this.isRecording) {
         if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Reiniciando reconhecimento (onend automático)`);
         try {
           this.recognition.start();
-        } catch (e) {
-          // Ignora erro de start duplicado
-        }
+        } catch (e) {}
       }
     };
   }
 
   startRecording(): Promise<string> {
-    this.lastTranscript = '';
+    this.lastTranscript = ''; // Limpa só ao iniciar!
     this.isRecording = true;
     try {
       this.recognition.start();
@@ -86,12 +83,12 @@ export class WebSpeechSttService {
     try {
       this.recognition.stop();
       if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Gravação encerrada pelo usuário`);
+      if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Valor ao enviar: ${this.lastTranscript}`);
     } catch (e) {
       if (this.addLogEntry) this.addLogEntry('SYSTEM', `[STT] Erro ao parar: ${e}`);
     }
-    // Sempre retorna o último texto registrado, mesmo que o recognition tenha parado antes!
     if (this.resolve) {
-      this.resolve(this.lastTranscript);
+      this.resolve(this.lastTranscript); // Sempre retorna o último valor!
       this.resolve = undefined;
       this.reject = undefined;
     }
