@@ -9,7 +9,6 @@ import ChatPanel from './components/ChatPanel';
 import RightPanel from './components/RightPanel';
 
 const App: React.FC = () => {
-  // Core state
   const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [logEntries, setLogEntries] = useState<string[]>([]);
@@ -17,16 +16,12 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [isChatActive, setIsChatActive] = useState(false);
-
-  // Audio state
   const [isListening, setIsListening] = useState(false);
+
   const [isAudioOutputEnabled, setIsAudioOutputEnabled] = useState(true);
   const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
 
-  // Transcrição pendente
-  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
-
-  // Service refs
+  // Serviços
   const assistantServiceRef = useRef<OpenAIAssistantsService | null>(null);
   const ttsServiceRef = useRef<ElevenLabsTtsService | null>(null);
   const sttServiceRef = useRef<WebSpeechSttService | null>(null);
@@ -36,7 +31,7 @@ const App: React.FC = () => {
     setLogEntries(prev => [...prev, `[${timestamp}] [${source}] ${content}`]);
   }, []);
 
-  // Initialize everything on mount
+  // Inicialização
   useEffect(() => {
     const initializeApp = async () => {
       setIsInitializing(true);
@@ -45,15 +40,12 @@ const App: React.FC = () => {
       try {
         const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
         const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
-
         if (!OPENAI_API_KEY || !ELEVENLABS_API_KEY) {
           throw new Error("Chaves de API não configuradas. Verifique as variáveis de ambiente VITE_OPENAI_API_KEY e VITE_ELEVENLABS_API_KEY.");
         }
-
         const currentUserId = getUserId();
         setUserId(currentUserId);
         addLogEntry('SYSTEM', `ID de usuário identificado: ${currentUserId}`);
-
         addLogEntry('SYSTEM', 'A base de conhecimento é gerenciada pelo assistente OpenAI.');
 
         sttServiceRef.current = new WebSpeechSttService(addLogEntry);
@@ -63,7 +55,6 @@ const App: React.FC = () => {
 
         ttsServiceRef.current = new ElevenLabsTtsService(ELEVENLABS_API_KEY, addLogEntry);
         assistantServiceRef.current = new OpenAIAssistantsService(OPENAI_API_KEY, addLogEntry);
-
         await assistantServiceRef.current.init(currentUserId);
 
         const userHistory = getHistory(currentUserId);
@@ -120,7 +111,6 @@ const App: React.FC = () => {
 
     try {
       const stream = assistantServiceRef.current!.sendMessageStream(messageText);
-
       let botResponse = '';
       const botMessageId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, { id: botMessageId, text: '', sender: MessageSender.BOT }]);
@@ -149,49 +139,37 @@ const App: React.FC = () => {
     }
   }, [userId, isChatActive, addLogEntry, isAudioOutputEnabled]);
 
-  // === Modificado: Gravação só gera transcrição ===
-  const startListening = useCallback(async () => {
-    if (isLoading || isInitializing || !isSpeechRecognitionSupported || !sttServiceRef.current || isListening) return;
-
-    ttsServiceRef.current?.interrupt();
+  // Iniciar gravação (não aguarda Promise)
+  const startListening = useCallback(() => {
+    if (!isSpeechRecognitionSupported || !sttServiceRef.current || isListening) return;
     setIsListening(true);
+    sttServiceRef.current.startRecording();
+  }, [isSpeechRecognitionSupported, isListening]);
 
-    try {
-      const transcript = await sttServiceRef.current.startRecording();
-      setIsListening(false);
-      if (transcript) {
-        setPendingTranscript(transcript); // Guarda a transcrição para exibir
-      } else {
-        addLogEntry('SYSTEM', 'A transcrição falhou ou estava vazia.');
-      }
-    } catch (error) {
-      const err = error as Error;
-      addLogEntry('SYSTEM', `Erro durante a gravação: ${err.message}`);
-      setIsListening(false);
+  // Parar gravação e enviar
+  const stopAndSendTranscript = useCallback(async () => {
+    if (!sttServiceRef.current || !isListening) return;
+    setIsListening(false);
+    const transcript = await sttServiceRef.current.stopRecording();
+    if (transcript && transcript.trim()) {
+      await processMessage(transcript);
+    } else {
+      addLogEntry('SYSTEM', 'A transcrição falhou ou estava vazia.');
     }
-  }, [isLoading, isInitializing, isSpeechRecognitionSupported, isListening, addLogEntry]);
+  }, [isListening, processMessage, addLogEntry]);
 
-  // Envia a transcrição pendente apenas quando clicar no botão
-  const handleSendTranscript = useCallback(() => {
-    if (pendingTranscript) {
-      processMessage(pendingTranscript);
-      setPendingTranscript(null);
-    }
-  }, [pendingTranscript, processMessage]);
+  // Cancelar gravação e descartar transcrição
+  const cancelListening = useCallback(() => {
+    if (!sttServiceRef.current || !isListening) return;
+    setIsListening(false);
+    sttServiceRef.current.cancelRecording();
+    addLogEntry('SYSTEM', 'Gravação de voz cancelada pelo usuário.');
+  }, [isListening, addLogEntry]);
 
   const handleSendMessage = useCallback((text: string) => {
     if (!isChatActive) return;
-    if (isListening) {
-      sttServiceRef.current?.stopRecording();
-    } else {
-      processMessage(text);
-    }
-  }, [isChatActive, isListening, processMessage]);
-
-  const cancelListening = () => {
-    if (!sttServiceRef.current) return;
-    sttServiceRef.current.cancelRecording();
-  };
+    processMessage(text);
+  }, [isChatActive, processMessage]);
 
   const toggleAudioOutput = () => {
     setIsAudioOutputEnabled(prev => {
@@ -216,16 +194,13 @@ const App: React.FC = () => {
             onStartChat={handleStartChat}
             isListening={isListening}
             startListening={startListening}
+            stopAndSendTranscript={stopAndSendTranscript}
             cancelListening={cancelListening}
             isSpeechRecognitionSupported={isSpeechRecognitionSupported}
             isAudioOutputEnabled={isAudioOutputEnabled}
             toggleAudioOutput={toggleAudioOutput}
             isInitializing={isInitializing}
             initializationError={initializationError}
-            // Props novas para transcrição pendente:
-            pendingTranscript={pendingTranscript}
-            setPendingTranscript={setPendingTranscript}
-            handleSendTranscript={handleSendTranscript}
           />
         </div>
         <div className="lg:col-span-5 h-full max-h-full">
