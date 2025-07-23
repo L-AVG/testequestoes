@@ -15,11 +15,6 @@ interface ChatPanelProps {
   toggleAudioOutput: () => void;
   isInitializing: boolean;
   initializationError: string | null;
-
-  // Novas props:
-  pendingTranscript: string | null;
-  setPendingTranscript: (v: string | null) => void;
-  handleSendTranscript: () => void;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -36,10 +31,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   toggleAudioOutput,
   isInitializing,
   initializationError,
-
-  pendingTranscript,
-  setPendingTranscript,
-  handleSendTranscript,
 }) => {
   const [input, setInput] = React.useState('');
 
@@ -54,25 +45,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         ))}
       </div>
-      {/* BLOCO DA TRANSCRIÇÃO PENDENTE */}
-      {pendingTranscript && (
-        <div className="mb-4 p-4 bg-yellow-100 rounded-lg shadow">
-          <div className="mb-2 font-semibold">Transcrição pronta:</div>
-          <textarea
-            className="w-full p-2 border rounded"
-            rows={3}
-            value={pendingTranscript}
-            onChange={e => setPendingTranscript(e.target.value)}
-          />
-          <button
-            className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={handleSendTranscript}
-            disabled={isLoading}
-          >
-            Enviar
-          </button>
-        </div>
-      )}
       <div className="flex gap-2 items-end">
         <input
           className="flex-1 border rounded-lg px-4 py-2"
