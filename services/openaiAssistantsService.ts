@@ -48,7 +48,7 @@ export class OpenAIAssistantsService {
   }
 
   private async getOrCreateAssistant(): Promise<void> {
-    const PRECONFIGURED_ASSISTANT_ID = 'asst_BYxjOn6Y6HlOa6e1L9eI1LYV';
+    const PRECONFIGURED_ASSISTANT_ID = 'asst_VQbuuAERlLbZaIC95bPTvVMU';
     this.addLogEntry('SYSTEM', `Usando o ID de assistente pré-configurado: ${PRECONFIGURED_ASSISTANT_ID}`);
 
     try {
