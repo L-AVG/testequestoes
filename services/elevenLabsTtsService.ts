@@ -5,7 +5,7 @@ export class ElevenLabsTtsService {
   private apiKey: string;
   private audio: HTMLAudioElement | null = null;
   private addLogEntry: (source: 'SYSTEM', content: string) => void;
-  private static VOICE_ID = 'kdmDKE6EkgrWrrykO9Qt'; // Rachel (popular default voice)
+  private static VOICE_ID = 'RILOU7YmBhvwJGDGjNmP'; // Rachel (popular default voice)
 
   constructor(apiKey: string, addLogEntry: (source: 'SYSTEM', content: string) => void) {
     if (!apiKey) {
